@@ -9,22 +9,263 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+```{r}
+library(tidyverse)
+library(rvest)
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+set.seed(1)
 ```
 
-## Including Plots
+# Problem 1
 
-You can also embed plots, for example:
+This chunk includes a function that randomly draws birthdays for each person in a fixed group of size "n_room". This function also checks whether there are duplicate birthdays in the group and returns TRUE or FALSE based on the result.
+```{r}
+bday_sim = function(n_room) {
+  birthdays = sample(1:365, n_room, replace = TRUE)
+  repeated_bday = length(unique(birthdays)) < n_room
+  repeated_bday
+}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+bday_sim(20)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+This code chunk runs the previous function 10000 times for each group size between 2 and 50. It then computes the probability that at least 2 people in the group will share a birthday by averaging the simulation runs. 
+```{r}
+bday_sim_results = 
+  expand_grid(
+    bdays = 2:50,
+    iter = 1:10000
+  ) |>
+  mutate(
+    result = map_lgl(bdays, bday_sim)
+  )|>
+  group_by(
+    bdays
+  )  |>
+  summarize(
+    prob_repeat = mean(result)
+  )
+```
+
+This code chunk plots probability as a function of group size.These results show that as the number of people in each group increases, the probability that at least two people in the group have the same birthday also increases.
+```{r}
+bday_sim_results |>
+  ggplot(aes(x = bdays, y= prob_repeat)) +
+  geom_point() +
+  geom_line() +
+  labs( 
+    title = "Probability as a Function of Group Size",
+    x = "Group Size",
+    y = "Probability of Repeated Birthday")
+```
+
+
+# Problem 2
+NOTE TO SELF: FOR THE MOST PART THE CODING FOR THIS QUESTION IS DONE. MAYBE JUST CLEAN AXIS TITLES AND SUCH AND DELETE UNNECESSARY CODE. MUST STILL ANSWER WRITTEN QUESTIONS AND INTERPRETATION BUT YAYYYYY DID THE CODE. ALSO DO NOT FORGET TO CHANGE FROM 50 TO 5000 DATASETS!!!!!
+
+This code chunk sets the design elements n= 30 and sigma = 5. 
+```{r}
+sim_mu_hat = function(mu, n = 30, sigma = 5) {
+  
+  sim_data = 
+    tibble(
+      x = rnorm(mean = mu, n, sd = sigma)
+    )
+    sim_data |>
+    summarize(
+      mu_hat = mean(x))
+    
+    t.test(sim_data, mu = 0, alpha = 0)|>
+      broom::tidy()|>
+      mutate(
+        mu_hat = estimate
+      ) |>
+      select(mu_hat, p.value)
+
+}
+```
+
+
+This generates 50 datasets from the given model when mu = 0. 
+```{r}
+output_mu_zero = 
+  rerun(50, sim_mu_hat(mu = 0)) |>
+  bind_rows()
+
+```
+
+This code chunk creates a list for the different values of mu. 
+```{r}
+mu_list = 
+  list(
+    "mu = 1" = 1,
+    "mu = 2" = 2,
+    "mu = 3" = 3,
+    "mu = 4" = 4,
+    "mu = 5" = 5,
+    "mu = 6" = 6
+  )
+```
+
+OFFICE HOURS QUESTION: I ran this as i was reviewing lecture notes, but i believe it does the same as the code chunk below... can i just delete this?
+```{r}
+output = vector("list", length = 6)
+
+for(i in 1:6) {
+  
+  output [[i]] = 
+    rerun(50, sim_mu_hat(mu = mu_list[[i]])) %>%
+    bind_rows()
+}
+```
+
+
+This creates a dataframe with the values of mu_hat for each value of mu.
+```{r}
+sim_results =
+  tibble(
+    mu = c(1, 2, 3, 4, 5, 6)
+    ) %>%
+      mutate(
+        output_lists = map(.x = mu, ~rerun(50, sim_mu_hat(.x))),
+        estimate_df = map(output_lists, bind_rows)
+    )%>%
+    select(-output_lists)%>%
+    unnest(estimate_df)
+```
+
+
+This code chunk calculates the power of the test. 
+```{r}
+sim_proportion_df =
+sim_results |>
+  mutate(
+    rejected_status = 
+      case_when(
+        p.value<0.05 ~ "rejected",
+        p.value>0.05 ~ "fail to reject"))
+```
+
+
+This code chunk shows the proportion of times the null was rejected (power of the test) on the y axis and the true value of mu on the x axis. As the true value of mu increases, the power of the test also increases, until mu =4, then the power plateus at y =1. 
+```{r}
+sim_proportion_df |>
+  group_by(mu, rejected_status)|>
+  summarize(
+    n= n()
+  )|>
+  pivot_wider(
+    names_from = rejected_status,
+    values_from = n
+  )|>
+  mutate(
+    power = rejected / 50
+  )|>
+  
+ggplot(
+    aes(x = mu, y = power)) +
+    geom_point() +
+    labs(
+      x = "True Value of Mu",
+      y = "Power of the Test"
+    )
+```
+
+This plot shows the average estimates of mu_hat on the y axis and the true value of mu on the x axis. Based on the results of this graph, the estimates of mu hat are proportional to the true value of mu.
+```{r}
+sim_results |>
+  group_by(mu)|>
+  summarize(
+    mean_mu_hat = mean(mu_hat)
+  )|>
+  ggplot(
+    aes(x = mu, y = mean_mu_hat)) +
+    geom_point() +
+    labs(
+      x = "True Value of Mu",
+      y = "Average Estimate of Mu Hat"
+    )
+```
+
+This plot shows the average estimate of mu_hat (only in samples for which the null was rejected) on the y axis and the true value of mu on the x axis.
+```{r}
+sim_proportion_df |>
+  filter(str_detect(rejected_status, "rejected"))|>
+  group_by(mu)|>
+  summarize(
+    rejected_mean_mu_hat = mean(mu_hat)
+  )|>
+  ggplot(
+    aes(x = mu, y = rejected_mean_mu_hat)) +
+    geom_point() +
+    labs(
+      x = "True Value of Mu",
+      y = "Average Estimate of Mu Hat when Null was Rejected"
+    )
+```
+
+
+# Problem 3
+NOTE FOR OFFICE HOURS: Noticed issue with original dataset-> there is a datapoint that has the city/state listed as tulsa, AL. I just filtered it out, is that okay?
+Mention the issue with tulsa and how it was addressed.
+
+This code chunk imports the raw data. This data includes information on homicides in 50 large U.S. cities. The raw data set includes 52179 observations of 12 variables. This code chunk cleans the names in the dataset. It also unites the city and state columns, and removes inconsistent data for city_state. 
+
+```{r}
+homicide_df = 
+  read_csv("homicide-data.csv")|>
+  janitor::clean_names()|>
+  unite("city_state", city, state, sep = ", ")|>
+  mutate(
+    city_state = fct_infreq(city_state)
+  )|>
+  filter(!(city_state == "Tulsa, AL"))
+```
+
+
+This code chunk creates a dataframe, called city_df, that groups the data  by city and computes the total number of homicides in each city. It also creates a dataframe, called unsolved_df, that filters the data to only include unsolved homicides and computes the number of unsolved homicides in each city. The dataframe, called city_homicides_df, is also created, which joins the 2 previous data frames. The city_homicides_df includes three columns, city_state, total homicides, and unsolved homicides. 
+```{r}
+total_city_df <- homicide_df |>
+  group_by(city_state) |>
+  summarize(
+    total_homicides = n())
+
+unsolved_city_df <- homicide_df |>
+  filter(str_detect(disposition, "[Closed without arrest] [Open/No arrest]"))|>
+  group_by(city_state)|>
+  summarize(
+    unsolved_homicides = n())
+
+city_homicides_df =
+  left_join(total_city_df, unsolved_city_df, by = "city_state")
+```
+
+
+
+
+```{r}
+baltimore_df =
+  city_homicides_df|>
+  filter(city_state == "Baltimore, MD")
+
+prop.test(baltimore_df |>
+        pull(unsolved_homicides), 
+               baltimore_df |>
+          pull(total_homicides))|>
+  broom::tidy()|>
+  mutate(estimated_proportion = estimate)|>
+  select(estimated_proportion, conf.low, conf.high)|>
+  unite("confidence_interval", conf.low, conf.high, sep = ", ")
+```
+
+
+
+```{r}
+
+
+
+```
+
+
+
