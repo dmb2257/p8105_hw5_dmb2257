@@ -12,7 +12,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 library(rvest)
-
 set.seed(1)
 ```
 
@@ -26,9 +25,7 @@ bday_sim = function(n_room) {
   repeated_bday
 }
 
-bday_sim(20)
 ```
-
 
 This code chunk runs the previous function 10000 times for each group size between 2 and 50. It then computes the probability that at least 2 people in the group will share a birthday by averaging the simulation runs. 
 ```{r}
@@ -48,7 +45,8 @@ bday_sim_results =
   )
 ```
 
-This code chunk plots probability as a function of group size.These results show that as the number of people in each group increases, the probability that at least two people in the group have the same birthday also increases.
+
+This code chunk plots probability of a repeated birthday as a function of group size.These results show that as the number of people in each group increases, the probability that at least two people in the group have the same birthday also increases.
 ```{r}
 bday_sim_results |>
   ggplot(aes(x = bdays, y= prob_repeat)) +
@@ -62,9 +60,10 @@ bday_sim_results |>
 
 
 # Problem 2
-NOTE TO SELF: FOR THE MOST PART THE CODING FOR THIS QUESTION IS DONE. MAYBE JUST CLEAN AXIS TITLES AND SUCH AND DELETE UNNECESSARY CODE. MUST STILL ANSWER WRITTEN QUESTIONS AND INTERPRETATION BUT YAYYYYY DID THE CODE. ALSO DO NOT FORGET TO CHANGE FROM 50 TO 5000 DATASETS!!!!!
 
-This code chunk sets the design elements n= 30 and sigma = 5. 
+
+This code chunk sets the design elements n= 30 and sigma = 5. I created the function that will generate datasets from the model x~Normal[µ, σ]. This function saves mu_hat estimate and p-value from the test of H: mu = 0 and alpha = 0.05.
+
 ```{r}
 sim_mu_hat = function(mu, n = 30, sigma = 5) {
   
@@ -72,11 +71,12 @@ sim_mu_hat = function(mu, n = 30, sigma = 5) {
     tibble(
       x = rnorm(mean = mu, n, sd = sigma)
     )
+
     sim_data |>
     summarize(
       mu_hat = mean(x))
     
-    t.test(sim_data, mu = 0, alpha = 0)|>
+    t.test(sim_data, mu = 0, alpha = 0.05)|>
       broom::tidy()|>
       mutate(
         mu_hat = estimate
@@ -87,15 +87,18 @@ sim_mu_hat = function(mu, n = 30, sigma = 5) {
 ```
 
 
-This generates 50 datasets from the given model when mu = 0. 
+This generates 5000 datasets from the given model when mu = 0.
+
 ```{r}
 output_mu_zero = 
-  rerun(50, sim_mu_hat(mu = 0)) |>
+  rerun(5000, sim_mu_hat(mu = 0)) |>
   bind_rows()
 
 ```
 
+
 This code chunk creates a list for the different values of mu. 
+
 ```{r}
 mu_list = 
   list(
@@ -108,27 +111,16 @@ mu_list =
   )
 ```
 
-OFFICE HOURS QUESTION: I ran this as i was reviewing lecture notes, but i believe it does the same as the code chunk below... can i just delete this?
-```{r}
-output = vector("list", length = 6)
 
-for(i in 1:6) {
-  
-  output [[i]] = 
-    rerun(50, sim_mu_hat(mu = mu_list[[i]])) %>%
-    bind_rows()
-}
-```
+This creates a dataframe with the values of mu_hat for each value of mu. 
 
-
-This creates a dataframe with the values of mu_hat for each value of mu.
 ```{r}
 sim_results =
   tibble(
     mu = c(1, 2, 3, 4, 5, 6)
     ) %>%
       mutate(
-        output_lists = map(.x = mu, ~rerun(50, sim_mu_hat(.x))),
+        output_lists = map(.x = mu, ~rerun(5000, sim_mu_hat(.x))),
         estimate_df = map(output_lists, bind_rows)
     )%>%
     select(-output_lists)%>%
@@ -136,7 +128,8 @@ sim_results =
 ```
 
 
-This code chunk calculates the power of the test. 
+This code chunk creates a variable "rejected_status" that identifies whether the null is rejected or failed to be rejected for each dataset.
+
 ```{r}
 sim_proportion_df =
 sim_results |>
@@ -148,7 +141,10 @@ sim_results |>
 ```
 
 
-This code chunk shows the proportion of times the null was rejected (power of the test) on the y axis and the true value of mu on the x axis. As the true value of mu increases, the power of the test also increases, until mu =4, then the power plateus at y =1. 
+This code chunk summarizes the number of times the null was rejected and failed to be rejected. It then computes the power of the test by taking the proportion of times the null was rejected.
+
+This plot shows the power of the test on the y axis and the true value of mu on the x axis. There is a strong association between effect size and power. As the true value of mu increases, the power of the test also increases. The change in the power of the test becomes more gradual as the true value of mu increases. 
+
 ```{r}
 sim_proportion_df |>
   group_by(mu, rejected_status)|>
@@ -160,7 +156,7 @@ sim_proportion_df |>
     values_from = n
   )|>
   mutate(
-    power = rejected / 50
+    power = rejected / 5000
   )|>
   
 ggplot(
@@ -172,7 +168,8 @@ ggplot(
     )
 ```
 
-This plot shows the average estimates of mu_hat on the y axis and the true value of mu on the x axis. Based on the results of this graph, the estimates of mu hat are proportional to the true value of mu.
+
+This plot shows the average estimates of mu_hat on the y axis and the true value of mu on the x axis.
 ```{r}
 sim_results |>
   group_by(mu)|>
@@ -188,7 +185,9 @@ sim_results |>
     )
 ```
 
-This plot shows the average estimate of mu_hat (only in samples for which the null was rejected) on the y axis and the true value of mu on the x axis.
+
+This plot shows the average estimate of mu_hat (only in samples for which the null was rejected) on the y axis and the true value of mu on the x axis. Yes, the sample average of mu hat across tests for which the null is rejected is approximately equal to the true value of mu. This is because as the true value of mu increases, there is a greater proportion of times in which the null was rejected. As the power of the test approaches one, the greater the similarity between the average estimate of mu_hat and the average estimate of mu_hat when the null is rejected. 
+
 ```{r}
 sim_proportion_df |>
   filter(str_detect(rejected_status, "rejected"))|>
@@ -206,11 +205,15 @@ sim_proportion_df |>
 ```
 
 
-# Problem 3
-NOTE FOR OFFICE HOURS: Noticed issue with original dataset-> there is a datapoint that has the city/state listed as tulsa, AL. I just filtered it out, is that okay?
-Mention the issue with tulsa and how it was addressed.
 
-This code chunk imports the raw data. This data includes information on homicides in 50 large U.S. cities. The raw data set includes 52179 observations of 12 variables. This code chunk cleans the names in the dataset. It also unites the city and state columns, and removes inconsistent data for city_state. 
+
+
+
+
+# Problem 3
+
+This code chunk imports the raw data. This data includes information on homicides in 50 large U.S. cities. The raw data set includes 52179 observations of 12 variables. Upon reviewing the dataset, it was found that there was one observation that incorrectly listed Tusla in the state of Alabama. Since this is incorrect, this data point was filtered out of the dataset. 
+This code chunk cleans the names in the dataset. It also unites the city and state columns, and removes inconsistent data for city_state. 
 
 ```{r}
 homicide_df = 
@@ -224,14 +227,17 @@ homicide_df =
 ```
 
 
-This code chunk creates a dataframe, called city_df, that groups the data  by city and computes the total number of homicides in each city. It also creates a dataframe, called unsolved_df, that filters the data to only include unsolved homicides and computes the number of unsolved homicides in each city. The dataframe, called city_homicides_df, is also created, which joins the 2 previous data frames. The city_homicides_df includes three columns, city_state, total homicides, and unsolved homicides. 
+This code chunk creates a dataframe, called city_df, that summarizes the total number of homicides in each city. It also creates a dataframe, called unsolved_df, that summarizes the number of unsolved homicides in each city. The dataframe, city_homicides_df, is also created, which joins the 2 previous data frames. The city_homicides_df contains the total number of homicides and the number of unsolved homicides in each city.
+
 ```{r}
-total_city_df <- homicide_df |>
+total_city_df = 
+  homicide_df |>
   group_by(city_state) |>
   summarize(
     total_homicides = n())
 
-unsolved_city_df <- homicide_df |>
+unsolved_city_df = 
+  homicide_df |>
   filter(str_detect(disposition, "[Closed without arrest] [Open/No arrest]"))|>
   group_by(city_state)|>
   summarize(
@@ -242,30 +248,78 @@ city_homicides_df =
 ```
 
 
+For the city of Baltimore, MD, use the prop.test function to estimate the proportion of homicides that are unsolved; save the output of prop.test as an R object, apply the broom::tidy to this object and pull the estimated proportion and confidence intervals from the resulting tidy dataframe.
 
+QUESTION: For this do I have to use the pull function or is select okay?? 
 
+In this code chunk, a dataframe was created that only pertains to Baltimore, MD. Prop.test and broom::tidy were used to create a tidy dataframe of the estimate of proportion of homicides that are unsolved and the confidence interval. 
 ```{r}
 baltimore_df =
   city_homicides_df|>
   filter(city_state == "Baltimore, MD")
 
-prop.test(baltimore_df |>
+output_baltimore =
+  prop.test(baltimore_df |>
         pull(unsolved_homicides), 
                baltimore_df |>
           pull(total_homicides))|>
   broom::tidy()|>
-  mutate(estimated_proportion = estimate)|>
-  select(estimated_proportion, conf.low, conf.high)|>
-  unite("confidence_interval", conf.low, conf.high, sep = ", ")
+      select(estimate, conf.low, conf.high)
+
 ```
 
 
-
+This code chunk nests the city_homicides_df by each city.This code chunk also creates a function to apply the prop.test to each city data frame, tidy the dataframe, and select only the estimate and confidence interval for each city. 
 ```{r}
+nested_df <-
+  city_homicides_df|>
+  group_by(city_state)%>%
+  nest()
 
-
+city_func <-
+  function(df) {
+    prop.test(df |>
+                pull(unsolved_homicides),
+              df|> 
+                pull(total_homicides))|>
+      broom::tidy()|>
+      select(estimate, conf.low, conf.high)
+  }
 
 ```
+
+This code chunk creates a list column "listcol_estimates' of the tibbles for each city. Each tibble contains the estimate and confidence intervals for one city. This code chunk then adds the list column to the nested_df dataframe. The tidy dataframe was then created with the unnested data and only includes the estimated proportions and confidence intervals for each city. 
+```{r}
+listcol_estimates <- 
+  map(nested_df$data, city_func)
+
+nested_df =
+  nested_df %>%
+  mutate(list_estimates = map(data, city_func))
+
+tidy_df =
+  nested_df|>
+  unnest(data, list_estimates)|>
+  select(city_state, estimate, conf.low, conf.high)
+
+  
+```
+
+
+This code chunk creates a plot of the estimate of proportion of unsolved homicides for each city. This plot also includes error bars based on the upper and lower limits of the confidence intervals. The cities are organized by the proportion of unsolved homicides. 
+```{r}
+tidy_df |>
+  ggplot(
+    aes(fct_reorder(city_state, estimate), estimate)) +
+    geom_col() +
+    geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+    labs(
+      x = "Cities",
+      y = "Estimate of the Proportion of Homicides that are Unsolved"
+    ) +
+  theme(axis.text.x = element_text(angle = 65, hjust = 1))
+```
+
 
 
 
