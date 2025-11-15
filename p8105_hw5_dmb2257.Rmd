@@ -143,7 +143,7 @@ sim_results |>
 
 This code chunk summarizes the number of times the null was rejected and failed to be rejected. It then computes the power of the test by taking the proportion of times the null was rejected.
 
-This plot shows the power of the test on the y axis and the true value of mu on the x axis. There is a strong association between effect size and power. As the true value of mu increases, the power of the test also increases. The change in the power of the test becomes more gradual as the true value of mu increases. 
+This plot shows the power of the test on the y axis and the true value of mu on the x axis. There is a strong association between effect size and power. As the true value of mu increases, the power of the test also increases. The change in the power of the test is steep at the lower true mu values and becomes more gradual as the true value of mu increases. At mu= 4, the power of the test begins to plateau towards y = 1. 
 
 ```{r}
 sim_proportion_df |>
